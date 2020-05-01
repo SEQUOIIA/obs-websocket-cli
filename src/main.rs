@@ -1,10 +1,33 @@
 use tungstenite::Message;
 use serde::{Serialize, Deserialize};
 use sha2::Digest;
-use std::io::Write;
+use clap::Arg;
 
 fn main() {
-    let (mut socket, response) = tungstenite::connect(url::Url::parse("ws://pyra.clausen:4444").unwrap()).expect("Unable to connect");
+    let app = clap::App::new("obs-websocket-cli")
+        .version("0.0.1")
+        .author("SEQUOIIA <sequoiia@seq.tf>")
+        .arg(Arg::with_name("host")
+            .short("h")
+            .long("host")
+            .default_value("localhost:4444")
+            .help("Address and port where the OBS websocket server resides. Defaults to localhost:4444"))
+        .arg(Arg::with_name("password")
+            .short("pa")
+            .long("password")
+            .default_value("")
+            .help("If server requires a password, specify it with this parameter"))
+        .arg(Arg::with_name("payload")
+            .required(true)
+            .help("JSON payload for OBS websocket command"));
+
+    let matches = app.get_matches();
+    let host = matches.value_of("host").unwrap();
+    let password = matches.value_of("password").unwrap();
+    let payload = matches.value_of("payload").unwrap();
+
+    // app logic
+    let (mut socket, _response) = tungstenite::connect(url::Url::parse(format!("ws://{}", host).as_str()).unwrap()).expect("Unable to connect");
 
     let get_auth_required_req = GetAuthRequiredRequest::new();
     socket.write_message(Message::Text(serde_json::to_string(&get_auth_required_req).unwrap())).unwrap();
@@ -18,7 +41,7 @@ fn main() {
                 let gar_response : GetAuthRequiredResponse = serde_json::from_str(msg.clone().into_text().unwrap().as_str()).unwrap();
                 println!("{:?}", gar_response);
 
-                let pass_and_salt = format!("{}{}", "Y@bHYSPGDtr$5Q8!TiXD%#v9$5PG8T69BFyCmSonxd$yG72VXAnuCJ2vzc!hBAQu", gar_response.salt.unwrap());
+                let pass_and_salt = format!("{}{}", password, gar_response.salt.unwrap());
                 let mut hasher = sha2::Sha256::new();
                 hasher.input(&pass_and_salt);
                 let secret_hash = hasher.result();
@@ -36,8 +59,7 @@ fn main() {
             },
             "Authenticate" => {
                 if response.status.unwrap().contains("ok") {
-                    let version_req = GetVersionRequest::new();
-                    socket.write_message(Message::Text(serde_json::to_string(&version_req).unwrap())).unwrap();
+                    socket.write_message(Message::Text(serde_json::to_string(payload).unwrap())).unwrap();
                 }
             }
             _ => {}
@@ -62,10 +84,12 @@ macro_rules! impl_request {
         }
 
         impl $name {
+            #[allow(dead_code)]
             pub fn get_message_id(&self) -> String {
                 return $message_id.to_owned()
             }
 
+            #[allow(dead_code)]
             pub fn new() -> Self {
                 Self {
                     request_type: $message_id.to_owned(),
