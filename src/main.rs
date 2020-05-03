@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use tungstenite::Message;
 use serde::{Serialize, Deserialize};
 use sha2::Digest;
@@ -70,7 +72,7 @@ fn main() {
                     socket.write_message(Message::Text(payload.clone())).unwrap();
                 }
             }
-            _ => {}
+            _ => {std::process::exit(1);}
         };
     }
 }
