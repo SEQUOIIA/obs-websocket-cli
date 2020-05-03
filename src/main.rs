@@ -2,6 +2,8 @@ use tungstenite::Message;
 use serde::{Serialize, Deserialize};
 use sha2::Digest;
 use clap::Arg;
+use std::path::Path;
+use std::io::Read;
 
 fn main() {
     let app = clap::App::new("obs-websocket-cli")
@@ -13,18 +15,24 @@ fn main() {
             .default_value("localhost:4444")
             .help("Address and port where the OBS websocket server resides. Defaults to localhost:4444"))
         .arg(Arg::with_name("password")
-            .short("pa")
+            .short("p")
             .long("password")
             .default_value("")
             .help("If server requires a password, specify it with this parameter"))
         .arg(Arg::with_name("payload")
             .required(true)
-            .help("JSON payload for OBS websocket command"));
+            .help("JSON manifest for OBS websocket command"));
 
     let matches = app.get_matches();
     let host = matches.value_of("host").unwrap();
     let password = matches.value_of("password").unwrap();
-    let payload = matches.value_of("payload").unwrap();
+    let payload_path = matches.value_of("payload");
+    let payload = {
+        let mut file = std::fs::File::open(Path::new(payload_path.unwrap())).expect("Unable to read provided path for manifest");
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap();
+        content
+    };
 
     // app logic
     let (mut socket, _response) = tungstenite::connect(url::Url::parse(format!("ws://{}", host).as_str()).unwrap()).expect("Unable to connect");
@@ -59,7 +67,7 @@ fn main() {
             },
             "Authenticate" => {
                 if response.status.unwrap().contains("ok") {
-                    socket.write_message(Message::Text(payload.to_owned())).unwrap();
+                    socket.write_message(Message::Text(payload.clone())).unwrap();
                 }
             }
             _ => {}
