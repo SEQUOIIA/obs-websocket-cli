@@ -59,7 +59,7 @@ fn main() {
             },
             "Authenticate" => {
                 if response.status.unwrap().contains("ok") {
-                    socket.write_message(Message::Text(serde_json::to_string(payload).unwrap())).unwrap();
+                    socket.write_message(Message::Text(payload.to_owned())).unwrap();
                 }
             }
             _ => {}
